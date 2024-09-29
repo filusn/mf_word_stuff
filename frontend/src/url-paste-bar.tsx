@@ -40,8 +40,7 @@ export default function UrlPasteBar(): JSX.Element {
       })
       .then((response) => {
         console.log(response.data);
-        const result = response.data[0][0] === 0 ? true : false;
-        // setFirstScanResult(result);
+        setFirstScanResult(response.data);
       })
       .catch((error) => {
         console.error(error);
@@ -99,8 +98,8 @@ export default function UrlPasteBar(): JSX.Element {
       </Container>
       {firstScanResult !== undefined && urlToCheck !== undefined && (
         <div>
-          <ResultContainer isSafe={firstScanResult} url={urlToCheck} />
-          <Dashboard isSafe={firstScanResult} url={urlToCheck} />
+          <ResultContainer isSafe={firstScanResult} />
+          {/*<Dashboard isSafe={firstScanResult} url={urlToCheck} />*/}
         </div>
       )}
       {firstScanResult !== undefined && <ExtensionProposal/>}
