@@ -35,7 +35,8 @@ Twoim zadaniem jest równiez:
 
 Nie odpowiadaj w żaden inny sposób."""
 
-client = OpenAI()
+api_key = ""
+client = OpenAI(api_key=api_key)
 
 
 def extract_audio(video_path: Path) -> None:
