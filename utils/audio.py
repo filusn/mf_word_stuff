@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import numpy as np
+import stanza
 import translators as ts
 from moviepy.editor import VideoFileClip
 from openai import OpenAI
@@ -39,6 +40,15 @@ Nie odpowiadaj w żaden inny sposób."""
 
 api_key = ""
 client = OpenAI(api_key=api_key)
+
+
+def load_models():
+    """Function for downloading and setting up the models."""
+    # ----------------------------------------------------------------------------------
+    # stanza
+    # Download the Polish models
+    stanza.download("pl")
+    # ----------------------------------------------------------------------------------
 
 
 def extract_audio(video_path: Path) -> None:
@@ -178,3 +188,24 @@ def detect_loudness_changes(audio_path: Path, duration_threshold=500) -> dict:
         loud = "normal voice"
 
     return {"mean_loudness": mean_loudness, "voice_level": loud}
+
+
+def named_entity_recognition(text: str) -> list:
+    """Function performing Named Entity Recognition (NER).
+
+    Args:
+        text (str): Text to be analyzed.
+
+    Returns:
+        list: list of tuples of entities with their type.
+    """
+    entities = []
+
+    # Set up the Polish NER pipeline
+    nlp = stanza.Pipeline("pl", processors="tokenize,ner")
+    doc = nlp(text)
+
+    for entity in doc.entities:
+        entities.append((entity.text, entity.type))
+
+    return entities
