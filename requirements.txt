@@ -10,3 +10,6 @@ mediapipe
 librosa
 deepface==0.0.93
 easyocr
+praat-parselmouth
+Flask==3.0.3
+Flask-Cors==5.0.0
