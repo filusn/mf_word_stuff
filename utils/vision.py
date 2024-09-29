@@ -3,7 +3,56 @@ from pathlib import Path
 import cv2
 import mediapipe as mp
 import numpy as np
+from deepface import DeepFace
 from moviepy.editor import VideoFileClip
+
+
+def recognize_emotions(img_rgb: np.array) -> list:
+    """This function detects faces, recognizes emotions, age, gender and race
+    of people in an image. Ignores spoofed faces.
+
+    Args:
+        img_rgb (np.array): Image in RGB format.
+
+    Returns:
+        list: list in the form:
+            [{'age': 40,
+            'region': {'x': 142,
+            'y': 102,
+            'w': 266,
+            'h': 266,
+            'left_eye': None,
+            'right_eye': None},
+            'face_confidence': 0.89,
+            'gender': {'Woman': 88.8154923915863, 'Man': 11.184508353471756},
+            'dominant_gender': 'Woman',
+            'race': {'asian': 0.6278438959270716,
+            'indian': 1.7700599506497383,
+            'black': 0.28826487250626087,
+            'white': 49.327221512794495,
+            'middle eastern': 21.63582593202591,
+            'latino hispanic': 26.350781321525574},
+            'dominant_race': 'white',
+            'emotion': {'angry': 15.988580882549286,
+            'disgust': 0.002835433042491786,
+            'fear': 23.031800985336304,
+            'happy': 1.6180532053112984,
+            'sad': 27.11198925971985,
+            'surprise': 2.6565074920654297,
+            'neutral': 29.59023416042328},
+            'dominant_emotion': 'neutral'}]
+    """
+    try:
+        result = DeepFace.analyze(
+            img_path=img_rgb,
+            actions=["age", "gender", "race", "emotion"],
+            anti_spoofing=True,
+        )
+    except ValueError:
+        result = []
+
+    return result
+
 
 BaseOptions = mp.tasks.BaseOptions
 ObjectDetector = mp.tasks.vision.ObjectDetector
