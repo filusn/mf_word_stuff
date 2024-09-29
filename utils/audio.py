@@ -1,8 +1,10 @@
 from pathlib import Path
 
+import numpy as np
 import translators as ts
 from moviepy.editor import VideoFileClip
 from openai import OpenAI
+from pydub import AudioSegment, silence
 
 SYSTEM_PROMPT = """Jesteś nauczycielem komunikacji i oratorstwa oraz specjalistą do spraw wystąpień publicznych. Uczysz ludzi co poprawić podczas ich występów. Masz za zadanie znaleźć błędy i problemy w prezentacjach ludzi bazując na transkrypcjach. Błędy, na które powinieneś zwrócić uwagę to:
 
@@ -82,7 +84,97 @@ def check_transcription(transcription: str):
     return response.choices[0].message.content
 
 
-if __name__ == "__main__":
-    extract_audio("data/HY_2024_film_01.mp4")
-    transcription = transcribe_file("data/HY_2024_film_01.wav")
-    print(transcription)
+def detect_silences(audio_path: Path, duration_threshold=1000) -> list:
+    """Function detecting the silences in an audio.
+
+    Args:
+        audio_path (Path): Path to audio file.
+        duration_threshold: Minimum silence duration to consider (in milliseconds).
+
+    Returns:
+        list: list of silences in a [[start, stop, duration], ...] format
+    """
+    audio = AudioSegment.from_file(audio_path)
+
+    silences = []
+
+    # Define the threshold for silence in dBFS and the minimum duration of silence (in milliseconds)
+    silence_threshold = -45  # Silence below this dBFS level is considered
+    min_silence_len = duration_threshold  #
+
+    # Find silence moments
+    silent_ranges = silence.detect_silence(
+        audio, min_silence_len=min_silence_len, silence_thresh=silence_threshold
+    )
+
+    # Convert silent ranges to seconds
+    silent_ranges_in_sec = [
+        (start / 1000, stop / 1000) for start, stop in silent_ranges
+    ]
+
+    for start, stop in silent_ranges_in_sec:
+        silences.append([start, stop, stop - start])
+
+    return silences
+
+
+def detect_loudness_changes(audio_path: Path, duration_threshold=500) -> dict:
+    """Function detecting the silences in an audio.
+
+    Args:
+        audio_path (Path): Path to audio file.
+        duration_threshold: Minimum silence duration to consider (in milliseconds).
+
+    Returns:
+        dict: dictionary representing the values
+    """
+    audio = AudioSegment.from_file(audio_path)
+
+    silence_threshold = -45  # Threshold in dBFS for considering "too silent"
+    min_silence_len = 500
+
+    non_silent_chunks = silence.split_on_silence(
+        audio, min_silence_len=min_silence_len, silence_thresh=silence_threshold
+    )
+
+    # Reconstruct non-silent audio
+    non_silent_audio = AudioSegment.silent(duration=0)  # Start with empty audio segment
+    for chunk in non_silent_chunks:
+        non_silent_audio += chunk
+
+    # Define parameters
+    chunk_size = 500  # Analyze the audio in chunks of 500ms
+
+    # Split the audio into chunks
+    num_chunks = len(non_silent_audio) // chunk_size
+    loudness_values = []
+
+    # Collect loudness values for each chunk
+    for i in range(num_chunks):
+        chunk = non_silent_audio[i * chunk_size : (i + 1) * chunk_size]
+        loudness = chunk.dBFS
+        loudness_values.append(loudness)
+
+    # Calculate the mean and standard deviation of loudness
+    mean_loudness = np.mean(loudness_values)
+    std_loudness = np.std(loudness_values)
+
+    print(f"Mean loudness: {mean_loudness:.2f} dBFS")
+    print(f"Standard deviation: {std_loudness:.2f} dBFS")
+
+    # Detect deviations from the mean (e.g., more than 1 standard deviation)
+    loud_occurences = 0
+    for i, loudness in enumerate(loudness_values):
+        if loudness > mean_loudness + 2 * std_loudness:
+            loud_occurences += 1
+        elif loudness < mean_loudness - 2 * std_loudness:
+            loud_occurences -= 1
+
+    if loud_occurences > 0:
+        loud = "voice raised"
+    elif loud_occurences < 0:
+        loud = "voice_lowered"
+    else:
+        loud = "normal voice"
+
+    return {"mean_loudness": mean_loudness, "voice_level": loud}

@@ -1,0 +1,5 @@
+moviepy==1.0.3
+numpy==1.26.4
+openai==1.50.2
+pydub==0.25.1
+translators==5.9.3
