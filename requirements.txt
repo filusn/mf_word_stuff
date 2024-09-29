@@ -6,7 +6,14 @@ translators==5.9.3
 stanza==1.9.2
 textstat==0.7.4
 opencv-python
-mediapipe
+mediapipe==0.10.15
 librosa
 deepface==0.0.93
 easyocr
+nltk==3.9.1
+python-Levenshtein==0.26.0
+fuzzywuzzy[speedup]
+rapidfuzz
+praat-parselmouth==0.4.4
+scikit-learn==1.5.2
+scipy==1.14.1
