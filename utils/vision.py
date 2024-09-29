@@ -1,10 +1,21 @@
+import difflib
 from pathlib import Path
 
 import cv2
+import easyocr
 import mediapipe as mp
+import nltk
 import numpy as np
 from deepface import DeepFace
-from moviepy.editor import VideoFileClip
+from nltk.tokenize import sent_tokenize
+
+# TODO: Remove this ugly thing :(
+from utils.metrics import *
+
+
+def setup_models():
+    nltk.download("punkt_tab")
+    easyocr.Reader(["pl"])
 
 
 def recognize_emotions(img_rgb: np.array) -> list:
@@ -221,3 +232,149 @@ def detect_twists_gests(video_path: Path):
         cap.release()
 
     return detection_results
+
+
+def extract_subtitles(video_path, reader, frame_skip=20) -> str:
+    """
+    Extract subtitles from video using EasyOCR.
+
+    Args:
+        video_path (str): Path to the video file.
+        reader (easyocr.Reader): Initialized EasyOCR reader.
+        output_dir (str): Directory to save extracted subtitles.
+        frame_skip (int): Number of frames to skip between OCR scans to reduce redundancy.
+    """
+    cap = cv2.VideoCapture(video_path)
+    frame_count = 0
+    last_text = ""
+    subtitles = []
+
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        frame = frame[880:, 460:1460]
+        # Perform OCR every 'frame_skip' frames to reduce processing
+        if frame_count % frame_skip == 0:
+            # Optionally, crop the frame to the subtitle area to improve OCR accuracy
+            # For simplicity, we'll use the entire frame here
+            result = reader.readtext(frame, detail=0, paragraph=True)
+            text = " ".join(result).strip()
+
+            if text and text != last_text:
+                subtitles.append(text)
+                last_text = text
+                print(f"Extracted Subtitle: {text}")
+
+        frame_count += 1
+
+    cap.release()
+
+    return " ".join(subtitles)
+
+
+# Preprocess texts: lowercasing, removing extra spaces, etc.
+def preprocess_text(text):
+    text = text.lower()
+    text = " ".join(text.split())  # Remove extra whitespace
+    return text
+
+
+def align_segments(subtitles, transcription):
+    """
+    Align segments using SequenceMatcher's get_matching_blocks.
+
+    Args:
+        subtitles (list): List of subtitle segments.
+        transcription (list): List of transcription segments.
+
+    Returns:
+        list of tuples: Aligned pairs (subtitle, transcription)
+    """
+    matcher = difflib.SequenceMatcher(None, subtitles, transcription)
+    matches = matcher.get_matching_blocks()
+
+    aligned_pairs = []
+    for match in matches:
+        for i in range(match.size):
+            aligned_pairs.append((subtitles[match.a + i], transcription[match.b + i]))
+
+    return aligned_pairs
+
+
+def compare_subtitles(video_path: Path, transcription_text: str):
+    reader = easyocr.Reader(["pl"])
+    extracted_subtitles_text = extract_subtitles(video_path, reader, frame_skip=15)
+
+    extracted_subtitles_text = preprocess_text(extracted_subtitles_text)
+    transcription_text = preprocess_text(transcription_text)
+
+    extracted_subtitles_sentences = sent_tokenize(extracted_subtitles_text)
+    transcription_sentences = sent_tokenize(transcription_text)
+
+    # Ensure both lists have the same length
+    min_length = min(len(extracted_subtitles_sentences), len(transcription_sentences))
+    extracted_subtitles_sentences = extracted_subtitles_sentences[:min_length]
+    transcription_sentences = transcription_sentences[:min_length]
+
+    # Initialize lists to store similarity scores
+    sequence_matcher_scores = []
+    levenshtein_scores = []
+    jaccard_scores = []
+    fuzzy_scores = []
+    rapidfuzz_scores = []
+
+    aligned_pairs = align_segments(
+        extracted_subtitles_sentences, transcription_sentences
+    )
+
+    # Now, compare aligned_pairs as before
+    for i, (subtitle, transcription) in enumerate(aligned_pairs, 1):
+        seq_score = calculate_sequence_matcher(subtitle, transcription)
+        lev_score = calculate_levenshtein(subtitle, transcription)
+        jac_score = calculate_jaccard(subtitle, transcription)
+        fuzz_score = calculate_fuzzy_matching(subtitle, transcription)
+        rapidfuzz_score = calculate_rapidfuzz_matching(subtitle, transcription)
+
+        sequence_matcher_scores.append(seq_score)
+        levenshtein_scores.append(lev_score)
+        jaccard_scores.append(jac_score)
+        fuzzy_scores.append(fuzz_score)
+        rapidfuzz_scores.append(rapidfuzz_score)
+
+    # Calculate average similarity scores
+    avg_seq = np.mean(sequence_matcher_scores) * 100
+    avg_lev = np.mean(levenshtein_scores) * 100
+    avg_jac = np.mean(jaccard_scores) * 100
+    avg_fuzz = np.mean(fuzzy_scores) * 100
+    avg_rapidfuzz = np.mean(rapidfuzz_scores) * 100
+
+    # Identify segments with low similarity (e.g., below 70%)
+    threshold = 70
+    for i in range(min_length):
+        if (
+            sequence_matcher_scores[i] * 100 < threshold
+            or levenshtein_scores[i] * 100 < threshold
+            or jaccard_scores[i] * 100 < threshold
+            or fuzzy_scores[i] * 100 < threshold
+            or rapidfuzz_scores[i] * 100 < threshold
+        ):
+            print(f"\nLow Similarity in Segment {i+1}:")
+            print(f"Subtitle: {extracted_subtitles_sentences[i]}")
+            print(f"Transcription: {transcription_sentences[i]}")
+            print(f"SequenceMatcher: {sequence_matcher_scores[i] * 100:.2f}%")
+            print(f"Levenshtein: {levenshtein_scores[i] * 100:.2f}%")
+            print(f"Jaccard: {jaccard_scores[i] * 100:.2f}%")
+            print(f"Fuzzy Matching: {fuzzy_scores[i] * 100:.2f}%")
+            print(f"RapidFuzz Matching: {rapidfuzz_scores[i] * 100:.2f}%")
+
+    similarity_scores = {
+        "Sequence Matcher Score": avg_seq,
+        "Levenshtein Distance": avg_lev,
+        "Jaccard Distance": avg_jac,
+        "Fuzzy Matching Score": avg_fuzz,
+        "Rapid Fuzzy Matching": avg_rapidfuzz,
+    }
+
+    return similarity_scores
