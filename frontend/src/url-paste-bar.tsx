@@ -1,37 +1,19 @@
-import axios from 'axios';
-import { useEffect, useState } from 'react';
+import axios from "axios";
+import { useEffect, useState } from "react";
 
-import Button from '@mui/material/Button';
-import Container from '@mui/material/Container';
-import TextField from '@mui/material/TextField';
-import Tooltip from '@mui/material/Tooltip';
-import Typography from '@mui/material/Typography';
+import Button from "@mui/material/Button";
+import Container from "@mui/material/Container";
+import TextField from "@mui/material/TextField";
+import Tooltip from "@mui/material/Tooltip";
+import Typography from "@mui/material/Typography";
 
-import { backend_port } from './constants';
-import Dashboard from './dashboard';
-import ExtensionProposal from './extension-proposal';
-import ResultContainer from './result-container';
-import { OurColors } from './theme';
-
-export function isValidUrl(url: string): boolean {
-  const urlPattern = new RegExp(
-    "^(https?://)?([a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,}(:\\d+)?(/.*)?$"
-  );
-  return urlPattern.test(url);
-}
+import { backend_port } from "./constants";
+import ResultContainer from "./result-container";
 
 export default function UrlPasteBar(): JSX.Element {
   const [urlToCheck, setUrlToCheck] = useState<string>();
-  const [inputError, setInputError] = useState<string>();
-  const [firstScanResult, setFirstScanResult] = useState<boolean>();
-
-  const validateInputUrl = () => {
-
-    handleFirstScan();
-
-  };
-
-  setTimeout(() => setInputError(""), 10000);
+  const [firstScanResult, setFirstScanResult] = useState<string>();
+  const [translation, setTranslation] = useState<string>();
 
   const handleFirstScan = () => {
     axios
@@ -47,12 +29,27 @@ export default function UrlPasteBar(): JSX.Element {
       });
   };
 
+  const handleTranslate = () => {
+    axios
+      .post(backend_port + "translateVideo", {
+        text: firstScanResult,
+      })
+      .then((response) => {
+        console.log(response.data);
+        setTranslation(response.data);
+      })
+      .catch((error) => {
+        console.error(error);
+      });
+  };
+
   console.log({ urlToCheck });
 
   useEffect(() => {
     // hook to refresh state
     if (urlToCheck === "") {
       setFirstScanResult(undefined);
+      setTranslation(undefined);
     }
   }, [urlToCheck]);
 
@@ -83,26 +80,35 @@ export default function UrlPasteBar(): JSX.Element {
             onChange={() => setUrlToCheck("")}
           />
           <div style={{ paddingLeft: "0.5em" }}>
-            <Tooltip title="We will search for risks on your website">
+            <Tooltip title="We will analyze your video">
               <Button
                 variant="contained"
                 color="primary"
-                onClick={validateInputUrl}
+                onClick={handleFirstScan}
               >
                 Analyze
               </Button>
             </Tooltip>
           </div>
         </div>
-        <p style={{ color: OurColors.red }}>{inputError}</p>
       </Container>
-      {firstScanResult !== undefined && urlToCheck !== undefined && (
+      {firstScanResult !== undefined && (
         <div>
-          <ResultContainer isSafe={firstScanResult} />
-          {/*<Dashboard isSafe={firstScanResult} url={urlToCheck} />*/}
+          <ResultContainer title="Transcription:" message={firstScanResult} />
+          <Tooltip title="We will translate transcript to English">
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleTranslate}
+            >
+              Translate
+            </Button>
+          </Tooltip>
+          {translation !== undefined && (
+            <ResultContainer title="Translation:" message={translation} />
+          )}
         </div>
       )}
-      {firstScanResult !== undefined && <ExtensionProposal/>}
     </div>
   );
 }
