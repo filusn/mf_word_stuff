@@ -2,6 +2,7 @@ from pathlib import Path
 
 import numpy as np
 import stanza
+import textstat
 import translators as ts
 from moviepy.editor import VideoFileClip
 from openai import OpenAI
@@ -46,9 +47,10 @@ def load_models():
     """Function for downloading and setting up the models."""
     # ----------------------------------------------------------------------------------
     # stanza
-    # Download the Polish models
     stanza.download("pl")
     # ----------------------------------------------------------------------------------
+    # textstat
+    textstat.set_lang("pl")
 
 
 def extract_audio(video_path: Path) -> None:
@@ -209,3 +211,25 @@ def named_entity_recognition(text: str) -> list:
         entities.append((entity.text, entity.type))
 
     return entities
+
+
+def calculate_stats(text: str):
+    textstat.flesch_reading_ease(text)
+    textstat.flesch_kincaid_grade(text)
+    textstat.smog_index(text)
+    textstat.coleman_liau_index(text)
+    textstat.automated_readability_index(text)
+    textstat.dale_chall_readability_score(text)
+    textstat.difficult_words(text)
+    textstat.linsear_write_formula(text)
+    gunning_fog = textstat.gunning_fog(text)
+    textstat.text_standard(text)
+    textstat.syllable_count(text)
+    textstat.lexicon_count(text, removepunct=True)
+    textstat.sentence_count(text)
+    textstat.char_count(text, ignore_spaces=True)
+    textstat.char_count(text, ignore_spaces=True)
+    textstat.polysyllabcount(text)
+    textstat.monosyllabcount(text)
+
+    return gunning_fog
