@@ -1,6 +1,10 @@
 from pathlib import Path
 
+import librosa
 import numpy as np
+import parselmouth
+import stanza
+import textstat
 import translators as ts
 from moviepy.editor import VideoFileClip
 from openai import OpenAI
@@ -39,6 +43,16 @@ Nie odpowiadaj w żaden inny sposób."""
 
 api_key = ""
 client = OpenAI(api_key=api_key)
+
+
+def load_models():
+    """Function for downloading and setting up the models."""
+    # ----------------------------------------------------------------------------------
+    # stanza
+    stanza.download("pl")
+    # ----------------------------------------------------------------------------------
+    # textstat
+    textstat.set_lang("pl")
 
 
 def extract_audio(video_path: Path) -> None:
@@ -178,3 +192,58 @@ def detect_loudness_changes(audio_path: Path, duration_threshold=500) -> dict:
         loud = "normal voice"
 
     return {"mean_loudness": mean_loudness, "voice_level": loud}
+
+
+def named_entity_recognition(text: str) -> list:
+    """Function performing Named Entity Recognition (NER).
+
+    Args:
+        text (str): Text to be analyzed.
+
+    Returns:
+        list: list of tuples of entities with their type.
+    """
+    entities = []
+
+    # Set up the Polish NER pipeline
+    nlp = stanza.Pipeline("pl", processors="tokenize,ner")
+    doc = nlp(text)
+
+    for entity in doc.entities:
+        entities.append((entity.text, entity.type))
+
+    return entities
+
+
+def calculate_stats(text: str):
+    textstat.flesch_reading_ease(text)
+    textstat.flesch_kincaid_grade(text)
+    textstat.smog_index(text)
+    textstat.coleman_liau_index(text)
+    textstat.automated_readability_index(text)
+    textstat.dale_chall_readability_score(text)
+    textstat.difficult_words(text)
+    textstat.linsear_write_formula(text)
+    gunning_fog = textstat.gunning_fog(text)
+    textstat.text_standard(text)
+    textstat.syllable_count(text)
+    textstat.lexicon_count(text, removepunct=True)
+    textstat.sentence_count(text)
+    textstat.char_count(text, ignore_spaces=True)
+    textstat.char_count(text, ignore_spaces=True)
+    textstat.polysyllabcount(text)
+    textstat.monosyllabcount(text)
+
+    return gunning_fog
+
+
+def mel_spectrogram(audio_path) -> np.array:
+    y, sr = librosa.load(audio_path)
+    mel_spectrogram = librosa.feature.melspectrogram(y=y, sr=sr)
+    return mel_spectrogram
+
+
+def sound_plot(audio_path) -> tuple[np.array]:
+    snd = parselmouth.Sound("data/HY_2024_film_19.wav")
+
+    return snd.xs(), snd.values.T
