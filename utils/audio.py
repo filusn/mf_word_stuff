@@ -1,6 +1,8 @@
 from pathlib import Path
 
+import librosa
 import numpy as np
+import parselmouth
 import stanza
 import textstat
 import translators as ts
@@ -233,3 +235,15 @@ def calculate_stats(text: str):
     textstat.monosyllabcount(text)
 
     return gunning_fog
+
+
+def mel_spectrogram(audio_path) -> np.array:
+    y, sr = librosa.load(audio_path)
+    mel_spectrogram = librosa.feature.melspectrogram(y=y, sr=sr)
+    return mel_spectrogram
+
+
+def sound_plot(audio_path) -> tuple[np.array]:
+    snd = parselmouth.Sound("data/HY_2024_film_19.wav")
+
+    return snd.xs(), snd.values.T
